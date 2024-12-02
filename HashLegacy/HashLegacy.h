@@ -12,7 +12,7 @@ using namespace std;
 
 // Шаблонный класс хеш-таблицы
 template <typename Key>
-class HashTable {
+class HashLegacy {
 private:
     // Вектор списков для хранения ключей
     vector<list<Key>> table;
@@ -34,32 +34,30 @@ public:
 
     static size_t djb2Hash(const Key& key) {
         size_t hash = 5381;
-        for (char c : to_string(key)) {
-            hash = ((hash << 5) + hash) + c;
-        }
+        auto key_hash = std::hash<Key>{}(key);
+        hash = ((hash << 5) + hash) + key_hash;
         return hash;
     }
 
+
     static size_t fnv1aHash(const Key& key) {
         size_t hash = 2166136261;
-        for (char c : to_string(key)) {
-            hash = (hash ^ c) * 16777219;
-        }
+        auto key_hash = std::hash<Key>{}(key);
+        hash = (hash ^ key_hash) * 16777219;
         return hash;
     }
 
     static size_t murmurHash(const Key& key) {
         size_t hash = 2166136261;
-        for (char c : to_string(key)) {
-            hash = (hash ^ c) * 0x5bd1e995;
-        }
+        auto key_hash = std::hash<Key>{}(key);
+        hash = (hash ^ key_hash) * 0x5bd1e995;
         return hash;
     }
 
     // Хеш-функция по умолчанию
     static size_t defaultHash(const Key& value) {
         // Простая хеш-функция, которая возвращает значение ключа
-        return value;
+        return fnv1aHash(value);
     }
 
     // Хеш-функция, использующая квадратичную функцию
@@ -68,11 +66,11 @@ public:
     }
  
 
-    HashTable(size_t capacity, function<size_t(const Key&)> hashFunction = defaultHash, double maxLoadFactor = 0.7)
+    HashLegacy(size_t capacity, function<size_t(const Key&)> hashFunction = defaultHash, double maxLoadFactor = 0.7)
         : table(capacity), hashFunction(hashFunction), _size(0), loadFactor(0.0), maxLoadFactor(maxLoadFactor) {}
 
     // Деструктор хеш-таблицы
-    ~HashTable() {}
+    ~HashLegacy() {}
 
     // Вставка ключа в таблицу
     // Сложность: O(1) в среднем случае, O(n) в худшем случае
@@ -219,7 +217,7 @@ public:
 
     // Статический метод для тестирования всех методов класса
     static void testAllMethods() {
-        HashTable<int> hashTable(10);
+        HashLegacy<int> hashTable(10);
 
         // Тестируем insert
         for (int i = 0; i < 100; i++) {
@@ -272,7 +270,7 @@ public:
         assert(!hashTable.contains(2000));
 
         // Тестируем rehash с пустой таблицей
-        HashTable<int> emptyHashTable(10);
+        HashLegacy<int> emptyHashTable(10);
         emptyHashTable.rehash();
         assert(emptyHashTable.size() == 0);
         cout << "All tests passed successfully!" << endl;
