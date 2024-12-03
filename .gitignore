@@ -361,3 +361,8 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/HashLegacy/ugolovnyj-kodeks-rf_RuLit_Net_123914.txt
+/HashLegacy/chart.txt
+/HashLegacy/cipfile.txt
+/HashLegacy/data.txt
+/HashLegacy/plot.gp
