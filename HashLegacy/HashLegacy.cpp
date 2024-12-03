@@ -3,25 +3,41 @@
 
 #include <iostream>
 #include "HashLegacy.h"
-
+#include "DictionaryLegacy.h"
+#include "SetLegacy.h"
+#include <utility>
 using namespace std;
 
 int main() {
-    HashLegacy<int>::testAllMethods();
-    // Создание хеш-таблицы с хэш-функцией по умолчанию
-    HashLegacy<string> hashTableDefault(10, HashLegacy<string>::djb2Hash);
-    hashTableDefault.insert("ФФ");
-    hashTableDefault.insert("!");
-    hashTableDefault.insert("XCFVGBHNJM");
+    // Создание словаря
+    Dictionary<string, int> dict(10);
+    //dict.put("apple", 5);
+    //dict.put("banana", 7);
 
-    // Проверка наличия ключа в таблице
-    std::cout << "Хэш-таблица с хэш-функцией по умолчанию:" << std::endl;
-    std::cout << "Содержит ключ 5: " << (hashTableDefault.contains("ФФ") ? "Да" : "Нет") << std::endl;
-    std::cout << "Содержит ключ 10: " << (hashTableDefault.contains("!") ? "Да" : "Нет") << std::endl;
-    std::cout << "Содержит ключ 15: " << (hashTableDefault.contains("FGHJK") ? "Да" : "Нет") << std::endl;
+    dict.insert("apple", 5);
+    dict.insert("banana", 7);
+    int value = dict["apple"];
+    // Получение значения по ключу
+    cout << value << endl; // Вывод: 5
+    for (auto const& val : dict) {
+        cout << val.key << ": " << val.value << endl;
+    }
+    
+    //// Проверка наличия ключа
+    cout << dict.contains("orange") << endl; // Вывод: 0
 
-
-
+    cout << "Set" << endl;
+    // Создание множества
+    Set<int> set(10);
+    set.insert(5);
+    set.insert(5);
+    set.insert(5);
+    set.insert(7);
+    for (auto const& val : set) {
+        cout << val << endl;
+    }
+    // Проверка наличия ключа
+    cout << set.contains(5) << endl; // Вывод: 1
 
     return 0;
 }

@@ -130,7 +130,10 @@
     <ClCompile Include="HashLegacy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DictionaryLegacy.h" />
     <ClInclude Include="HashLegacy.h" />
+    <ClInclude Include="PairLegacy.h" />
+    <ClInclude Include="SetLegacy.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

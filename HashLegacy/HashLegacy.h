@@ -1,4 +1,4 @@
-
+#pragma once
 #include <cassert>
 #include <iostream>
 #include <vector>
@@ -9,10 +9,104 @@
 
 using namespace std;
 
+/* Структура std::hash является шаблонным классом, который предоставляет хеш-функции для различных типов данных.
+ * Она используется для вычисления хеш-значений, которые необходимы для хеш-таблиц и других ассоциативных контейнеров.
+ *
+ * std::hash определен как шаблонный класс, что позволяет использовать его для различных типов данных.
+ * Например: std::hash<int>, std::hash<std::string> и т.д.
+ *
+ *   Требования к пользовательским типам:
+ *    - Для использования пользовательского типа необходимо определить специализацию std::hash для этого типа.
+ *    - Специализация должна перегружать оператор вызова функции и возвращать хеш-значение.
+ *    - Шаблон специализации для пользовательского класса:
+ *
+ *      namespace std {
+ *          template <>
+ *          struct hash<ClassName> {
+ *              size_t operator()(const ClassName& class) const {
+ *                  size_t hash = 5381;
+ *                  hash = ((hash << 5) + hash) + std::hash<int>{}(class.field1);
+ *                  ...
+ *                  hash = ((hash << 5) + hash) + std::hash<std::string>{}(class.fieldN);
+ *                  return hash;
+ *              }
+ *          };
+ *      }
+ */
+
+
+ // Класс-пример для тестирования
+ // Класс Юзера, содержащий ID и Имя
+class User {
+private:
+    int id;
+    string name;
+
+public:
+    User(int id, const std::string& name) : id(id), name(name) {}
+
+    int getId() const { return id; }
+    std::string getName() const { return name; }
+
+    // Оператор сравнения для проверки равенства двух объектов User
+    bool operator==(const User& other) const {
+        return id == other.id && name == other.name;
+    }
+
+    // Дружественная функция для хеш-функции, позволяет функции использовать приватные поля класса напрямую
+    friend struct std::hash<User>;
+};
+
+// Хеш-функция для класса User, определённая в пространстве имён std
+namespace std {
+    template <>
+    struct hash<User> {
+        size_t operator()(const User& user) const {
+            size_t hash = 5381;
+            hash = ((hash << 5) + hash) + std::hash<int>{}(user.id);
+            hash = ((hash << 5) + hash) + std::hash<std::string>{}(user.name);
+            return hash;
+        }
+    };
+}
+
+
+template <typename Key>
+size_t djb2Hash(const Key& key) {
+    size_t hash = 5381;
+    auto key_hash = std::hash<Key>{}(key);
+    hash = ((hash << 5) + hash) + key_hash;
+    return hash;
+}
+
+
+
+template <typename Key>
+ size_t fnv1aHash(const Key& key) {
+    size_t hash = 2166136261;
+    auto key_hash = std::hash<Key>{}(key);
+    hash = (hash ^ key_hash) * 16777219;
+    return hash;
+}
+template <typename Key>
+size_t murmurHash(const Key& key) {
+    size_t hash = 2166136261;
+    auto key_hash = std::hash<Key>{}(key);
+    hash = (hash ^ key_hash) * 0x5bd1e995;
+    return hash;
+}
+
+// Хеш-функция, использующая квадратичную функцию
+template <typename Key>
+size_t quadraticHash(const Key& value) {
+    return value * value + 3 * value + 7;
+}
+
+
 
 // Шаблонный класс хеш-таблицы
 template <typename Key>
-class HashLegacy {
+class HashTable {
 private:
     // Вектор списков для хранения ключей
     vector<list<Key>> table;
@@ -32,27 +126,6 @@ private:
 
 public:
 
-    static size_t djb2Hash(const Key& key) {
-        size_t hash = 5381;
-        auto key_hash = std::hash<Key>{}(key);
-        hash = ((hash << 5) + hash) + key_hash;
-        return hash;
-    }
-
-
-    static size_t fnv1aHash(const Key& key) {
-        size_t hash = 2166136261;
-        auto key_hash = std::hash<Key>{}(key);
-        hash = (hash ^ key_hash) * 16777219;
-        return hash;
-    }
-
-    static size_t murmurHash(const Key& key) {
-        size_t hash = 2166136261;
-        auto key_hash = std::hash<Key>{}(key);
-        hash = (hash ^ key_hash) * 0x5bd1e995;
-        return hash;
-    }
 
     // Хеш-функция по умолчанию
     static size_t defaultHash(const Key& value) {
@@ -60,17 +133,12 @@ public:
         return fnv1aHash(value);
     }
 
-    // Хеш-функция, использующая квадратичную функцию
-    size_t quadraticHash(const Key& value) {
-        return value * value + 3 * value + 7;
-    }
- 
 
-    HashLegacy(size_t capacity, function<size_t(const Key&)> hashFunction = defaultHash, double maxLoadFactor = 0.7)
+    HashTable(size_t capacity, function<size_t(const Key&)> hashFunction = defaultHash, double maxLoadFactor = 0.7)
         : table(capacity), hashFunction(hashFunction), _size(0), loadFactor(0.0), maxLoadFactor(maxLoadFactor) {}
 
     // Деструктор хеш-таблицы
-    ~HashLegacy() {}
+    ~HashTable() {}
 
     // Вставка ключа в таблицу
     // Сложность: O(1) в среднем случае, O(n) в худшем случае
@@ -90,6 +158,24 @@ public:
         if (loadFactor > maxLoadFactor) {
             rehash();
         }
+    }
+    //Хэширование
+    size_t hash(const Key& key) const {
+        return hashFunction(key);
+    }
+
+    list<Key>& getBucket(size_t index) {
+        if (index >= table.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return table[index];
+    }
+
+    const list<Key>& getBucket(size_t index) const {
+        if (index >= table.size()) {
+            throw std::out_of_range("Index out of range");
+        }
+        return table[index];
     }
 
     // Удаление ключа из таблицы
@@ -133,6 +219,10 @@ public:
 
     size_t size() const {
         return _size;
+    }
+
+    size_t capacity() const {
+        return table.size();
     }
 
     // Итератор для хеш-таблицы
@@ -217,7 +307,7 @@ public:
 
     // Статический метод для тестирования всех методов класса
     static void testAllMethods() {
-        HashLegacy<int> hashTable(10);
+        HashTable<int> hashTable(10);
 
         // Тестируем insert
         for (int i = 0; i < 100; i++) {
@@ -270,9 +360,120 @@ public:
         assert(!hashTable.contains(2000));
 
         // Тестируем rehash с пустой таблицей
-        HashLegacy<int> emptyHashTable(10);
+        HashTable<int> emptyHashTable(10);
         emptyHashTable.rehash();
         assert(emptyHashTable.size() == 0);
+
+        // Тестируем хеш-таблицу с строками
+        HashTable<string> stringHashTable(10);
+
+        // Тестируем insert для строк
+        stringHashTable.insert("hello");
+        stringHashTable.insert("world");
+        stringHashTable.insert("test");
+        stringHashTable.insert("example");
+
+        // Тестируем contains для строк
+        assert(stringHashTable.contains("hello"));
+        assert(stringHashTable.contains("world"));
+        assert(stringHashTable.contains("test"));
+        assert(stringHashTable.contains("example"));
+        assert(!stringHashTable.contains("not_in_table"));
+
+        // Тестируем erase для строк
+        stringHashTable.erase("hello");
+        assert(!stringHashTable.contains("hello"));
+        assert(stringHashTable.contains("world"));
+        assert(stringHashTable.contains("test"));
+        assert(stringHashTable.contains("example"));
+
+        // Тестируем rehash для строк
+        for (int i = 0; i < 100; i++) {
+            stringHashTable.insert("key" + to_string(i));
+        }
+        for (int i = 0; i < 100; i++) {
+            assert(stringHashTable.contains("key" + to_string(i)));
+        }
+
+        // Тестируем итератор для строк
+        count = 0;
+        for (auto it = stringHashTable.begin(); it != stringHashTable.end(); ++it) {
+            count++;
+        }
+        assert(count == 103); // 100 ключей "key0".."key99" + "world" + "test" + "example"
+
+        // Тестируем insert с одинаковыми ключами для строк
+        stringHashTable.insert("test");
+        stringHashTable.insert("test");
+        assert(stringHashTable.contains("test"));
+
+        // Тестируем erase с несуществующим ключом для строк
+        stringHashTable.erase("not_in_table");
+        assert(!stringHashTable.contains("not_in_table"));
+
+        // Тестируем contains с несуществующим ключом для строк
+        assert(!stringHashTable.contains("not_in_table"));
+
+        // Тестируем rehash с пустой таблицей для строк
+        HashTable<string> emptyStringHashTable(10);
+        emptyStringHashTable.rehash();
+        assert(emptyStringHashTable.size() == 0);
+
+        // Тестируем хеш-таблицу с ключами-пользовательскими классами
+        HashTable<User> userHashTable(10);
+
+        // Тестируем insert для пользовательских классов
+        User user1(1, "Alice");
+        User user2(2, "Bob");
+        User user3(3, "Charlie");
+        userHashTable.insert(user1);
+        userHashTable.insert(user2);
+        userHashTable.insert(user3);
+
+        // Тестируем contains для пользовательских классов
+        assert(userHashTable.contains(user1));
+        assert(userHashTable.contains(user2));
+        assert(userHashTable.contains(user3));
+        assert(!userHashTable.contains(User(4, "David")));
+
+        // Тестируем erase для пользовательских классов
+        userHashTable.erase(user1);
+        assert(!userHashTable.contains(user1));
+        assert(userHashTable.contains(user2));
+        assert(userHashTable.contains(user3));
+
+        // Тестируем rehash для пользовательских классов
+        for (int i = 0; i < 100; i++) {
+            userHashTable.insert(User(i + 4, "User" + to_string(i + 4)));
+        }
+        for (int i = 0; i < 100; i++) {
+            assert(userHashTable.contains(User(i + 4, "User" + to_string(i + 4))));
+        }
+
+        // Тестируем итератор для пользовательских классов
+        count = 0;
+        for (auto it = userHashTable.begin(); it != userHashTable.end(); ++it) {
+            count++;
+        }
+        assert(count == 102); // 100 пользователей + "Bob" + "Charlie"
+
+        // Тестируем insert с одинаковыми ключами для пользовательских классов
+        userHashTable.insert(user2);
+        userHashTable.insert(user2);
+        assert(userHashTable.contains(user2));
+
+        // Тестируем erase с несуществующим ключом для пользовательских классов
+        userHashTable.erase(User(1000, "NonExistent"));
+        assert(!userHashTable.contains(User(1000, "NonExistent")));
+
+        // Тестируем contains с несуществующим ключом для пользовательских классов
+        assert(!userHashTable.contains(User(1000, "NonExistent")));
+
+        // Тестируем rehash с пустой таблицей для пользовательских классов
+        HashTable<User> emptyUserHashTable(10);
+        emptyUserHashTable.rehash();
+        assert(emptyUserHashTable.size() == 0);
+
         cout << "All tests passed successfully!" << endl;
     }
 
