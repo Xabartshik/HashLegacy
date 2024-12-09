@@ -108,113 +108,130 @@ size_t quadraticHash(const Key& value) {
 template <typename Key>
 class HashTable {
 private:
-    // Вектор списков для хранения ключей
-    vector<list<Key>> table;
+    // Вектор ключей для хранения данных
+    vector<Key> table;
+    // Вектор флагов, указывающих, занята ли ячейка
+    vector<bool> occupied;
     // Хеш-функция
     function<size_t(const Key&)> hashFunction;
     // Количество ключей в таблице
     size_t _size;
-    // Коэффициент загрузки -- степень загруженности таблциы
+    // Коэффициент загрузки -- степень загруженности таблицы
     double loadFactor;
     // Максимальный коэффициент загрузки
     double maxLoadFactor;
-
-    // Функция линейного зондирования
-    size_t linearProbing(size_t index, size_t capacity) {
-        return (index + 1) % capacity;
-    }
-
 public:
-
-
     // Хеш-функция по умолчанию
     static size_t defaultHash(const Key& value) {
         // Простая хеш-функция, которая возвращает значение ключа
         return fnv1aHash(value);
     }
 
-
+    // Конструктор хеш-таблицы
     HashTable(size_t capacity, function<size_t(const Key&)> hashFunction = defaultHash, double maxLoadFactor = 0.7)
-        : table(capacity), hashFunction(hashFunction), _size(0), loadFactor(0.0), maxLoadFactor(maxLoadFactor) {}
+        : table(capacity), occupied(capacity, false), hashFunction(hashFunction), _size(0), loadFactor(0.0), maxLoadFactor(maxLoadFactor) {}
 
     // Деструктор хеш-таблицы
     ~HashTable() {}
 
     // Вставка ключа в таблицу
-    // Сложность: O(1) в среднем случае, O(n) в худшем случае
+        // Сложность: O(1) в среднем случае, O(n) в худшем случае
     void insert(const Key& key) {
-        // Вычисление индекса по хеш-функции
         size_t index = hashFunction(key) % table.size();
-        // Проверка на коллизию
-        if (find(table[index].begin(), table[index].end(), key) != table[index].end()) {
-            // Решение коллизии - линейное зондирование
-            index = linearProbing(index, table.size());
+
+        // Линейное зондирование для разрешения коллизий
+        while (occupied[index]) {
+            index = (index + 1) % table.size();
         }
-        // Вставка ключа в список по индексу
-        table[index].push_back(key);
+
+        table[index] = key;
+        occupied[index] = true;
         _size++;
         loadFactor = (double)_size / table.size();
-        // Перехеширование при превышении максимального коэффициента загрузки
+
         if (loadFactor > maxLoadFactor) {
             rehash();
         }
     }
+
+
     //Хэширование
     size_t hash(const Key& key) const {
         return hashFunction(key);
     }
 
-    list<Key>& getBucket(size_t index) {
-        if (index >= table.size()) {
-            throw std::out_of_range("Index out of range");
-        }
-        return table[index];
-    }
-
-    const list<Key>& getBucket(size_t index) const {
-        if (index >= table.size()) {
-            throw std::out_of_range("Index out of range");
-        }
-        return table[index];
-    }
-
     // Удаление ключа из таблицы
-    // Сложность: O(1) в среднем случае, O(n) в худшем случае
-    void erase(const Key& key) {// Вычисление индекса по хеш-функции
+        // Сложность: O(1) в среднем случае, O(n) в худшем случае
+    void erase(const Key& key) {
         size_t index = hashFunction(key) % table.size();
-        // Проверка на коллизию
-        auto it = find(table[index].begin(), table[index].end(), key);
-        if (it != table[index].end()) {
-            // Удаление ключа из списка по индексу
-            table[index].erase(it);
+
+        // Линейное зондирование для поиска ключа
+        while (occupied[index] && table[index] != key) {
+            index = (index + 1) % table.size();
+        }
+
+        // Если ключ найден, удаляем его, устанавливая флаг occupied в false
+        if (occupied[index] && table[index] == key) {
+            occupied[index] = false;
             _size--;
             loadFactor = (double)_size / table.size();
         }
     }
 
     // Проверка наличия ключа в таблице
-    // Сложность: O(1) в среднем случае, O(n) в худшем случае
+        // Сложность: O(1) в среднем случае, O(n) в худшем случае
     bool contains(const Key& key) const {
-        // Вычисление индекса по хеш-функции
         size_t index = hashFunction(key) % table.size();
-        // Проверка на коллизию
-        return find(table[index].begin(), table[index].end(), key) != table[index].end();
+
+        // Линейное зондирование для поиска ключа
+        while (occupied[index] && table[index] != key) {
+            index = (index + 1) % table.size();
+        }
+
+        return occupied[index] && table[index] == key;
     }
+
+    const Key& getListAtIndex(size_t index) const {
+        if (index >= table.size()) {
+            throw out_of_range("Index out of range");
+        }
+        return table[index];
+    }
+
+
+    Key& getListAtIndex(size_t index) {
+        if (index >= table.size()) {
+            throw out_of_range("Index out of range"); 
+        }
+        return table[index];
+    }
+
+    bool isOccupied(size_t index) const {
+        if (index >= table.size()) {
+            throw out_of_range("Index out of range"); 
+        }
+        return occupied[index];
+    }
+
+
+
 
     // Перехеширование при превышении максимального коэффициента загрузки
     void rehash() {
-        // Создание новой таблицы с удвоенной емкостью
-        vector<list<Key>> newTable(table.size() * 2);
-        // Перехеширование ключей в новую таблицу
-        for (const auto& list : table) {
-            for (const auto& key : list) {
-                size_t index = hashFunction(key) % newTable.size();
-                newTable[index].push_back(key);
+        size_t oldSize = table.size();
+        vector<Key> oldTable = table;
+        vector<bool> oldOccupied = occupied;
+
+        table.resize(oldSize * 2);
+        occupied.assign(oldSize * 2, false);
+        _size = 0;
+        loadFactor = 0.0;
+
+        for (size_t i = 0; i < oldSize; ++i) {
+            if (oldOccupied[i]) {
+                insert(oldTable[i]);
             }
         }
-        // Замена старой таблицы на новую
-        table = newTable;
-        loadFactor = (double)_size / table.size();
     }
 
     size_t size() const {
@@ -225,80 +242,62 @@ public:
         return table.size();
     }
 
-    // Итератор для хеш-таблицы
+
     class iterator {
     private:
-        // Указатель на текущий список
-        typename vector<list<Key>>::iterator currentList;
-        // Указатель на текущий элемент в списке
-        typename list<Key>::iterator currentElement;
-        // Указатель на конец таблицы
-        typename vector<list<Key>>::iterator endList;
+        typename std::vector<Key>::iterator current;
+        typename std::vector<Key>::iterator end;
+        const std::vector<bool>* occupied;
+        // Добавляем begin для расчета расстояния
+        typename std::vector<Key>::iterator begin;
+
 
     public:
-        // Конструктор итератора
-        iterator(typename vector<list<Key>>::iterator begin, typename vector<list<Key>>::iterator end)
-            : currentList(begin), endList(end) {
-            // Находим первый непустой список
-            while (currentList != endList && currentList->empty()) {
-                ++currentList;
-            }
-            if (currentList != endList) {
-                currentElement = currentList->begin();
+        iterator(typename std::vector<Key>::iterator begin, typename std::vector<Key>::iterator end, const std::vector<bool>* occupied)
+            : current(begin), end(end), occupied(occupied), begin(begin)  {
+            // Находим первый занятый элемент
+             while (current != end && !(*occupied)[std::distance(this->begin, current)]) {
+                ++current;
             }
         }
 
-        // Оператор инкремента
         iterator& operator++() {
-            // Переход к следующему элементу в списке
-            if (currentElement != currentList->end()) {
-                ++currentElement;
+            // Переходим к следующему элементу
+            ++current;
+
+            // Находим следующий занятый элемент
+            while (current != end && !(*occupied)[std::distance(this->begin, current)]) {
+                ++current;
             }
-            // Если достигли конца списка, переходим к следующему списку
-            if (currentElement == currentList->end()) {
-                ++currentList;
-                // Находим следующий непустой список
-                while (currentList != endList && currentList->empty()) {
-                    ++currentList;
-                }
-                if (currentList != endList) {
-                    currentElement = currentList->begin();
-                }
-            }
+            
             return *this;
         }
 
-        // Оператор разыменования
         Key& operator*() const {
-            return *currentElement;
+            return *current;
         }
 
-        // Оператор сравнения
         bool operator!=(const iterator& other) const {
-            if (currentList == endList && other.currentList == endList) {
-                return false; // Оба итератора достигли конца хеш-таблицы
-            }
-            if (currentList == endList || other.currentList == endList) {
-                return true; // Один из итераторов достиг конца хеш-таблицы
-            }
-            return currentList != other.currentList || currentElement != other.currentElement;
+            return current != other.current;
         }
     };
 
-    // Начало итератора
     iterator begin() {
-        return iterator(table.begin(), table.end());
+        return iterator(table.begin(), table.end(), &occupied);
     }
 
-    // Конец итератора
     iterator end() {
-        return iterator(table.end(), table.end());
+        return iterator(table.end(), table.end(), &occupied);
     }
+
     // Метод очистки значений хэш-таблицы
     void clear() {
-        // Очищаем все списки в таблице
-        for (auto& list : table) {
-            list.clear();
+        // Очищаем таблицу
+        for (auto& key : table) {
+            key = Key();
+        }
+        for (auto& key : occupied) {
+            key = false;
         }
         // Сбрасываем размер таблицы и коэффициент загрузки
         _size = 0;

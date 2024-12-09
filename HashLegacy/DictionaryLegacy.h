@@ -34,30 +34,85 @@ public:
     }
 
 
-    // Получение значения по ключу. 
+    // Получение значения по ключу.
     Value& operator[](const Key& key) {
-        KeyValuePair<Key, Value> tempPair(key, Value()); // Создаем временную пару для поиска
+        KeyValuePair<Key, Value> tempPair(key, Value());
         size_t index = table.hash(tempPair) % table.capacity();
-        for (auto& pair : table.getBucket(index)) { // Итерируемся только по нужному бакету
-            if (pair.key == key) {
-                return pair.value;
+        size_t originalIndex = index;
+
+        do {
+            // Проверяем, занята ли ячейка
+            if (table.isOccupied(index)) {
+                KeyValuePair<Key, Value>& pair = table.getListAtIndex(index);
+                if (pair.key == key) {
+                    return pair.value;
+                }
             }
-        }
-        throw std::out_of_range("Key not found");
+            index = (index + 1) % table.capacity();
+        } while (index != originalIndex);
+
+        throw runtime_error("Key not found");
     }
 
     // Получение значения по ключу (константная версия).
     const Value& operator[](const Key& key) const {
-        KeyValuePair<Key, Value> tempPair(key, Value()); // Создаем временную пару для поиска
+        KeyValuePair<Key, Value> tempPair(key, Value());
         size_t index = table.hash(tempPair) % table.capacity();
-        for (const auto& pair : table.getBucket(index)) { // Итерируемся только по нужному бакету
-            if (pair.key == key) {
-                return pair.value;
+        size_t originalIndex = index;
+
+        do {
+            // Проверяем, занята ли ячейка
+            if (table.isOccupied(index)) {
+                const KeyValuePair<Key, Value>& pair = table.getListAtIndex(index);
+                if (pair.key == key) {
+                    return pair.value;
+                }
             }
-        }
-        throw std::out_of_range("Key not found");
+            index = (index + 1) % table.capacity();
+        } while (index != originalIndex);
+
+        throw runtime_error("Key not found");
     }
 
+    // Поиск значения по ключу.
+    Value* find(const Key& key) {
+        KeyValuePair<Key, Value> tempPair(key, Value());
+        size_t index = table.hash(tempPair) % table.capacity();
+        size_t originalIndex = index;
+
+        do {
+            // Проверяем, занята ли ячейка
+            if (table.isOccupied(index)) {
+                KeyValuePair<Key, Value>& pair = table.getListAtIndex(index);
+                if (pair.key == key) {
+                    return &pair.value;
+                }
+            }
+            index = (index + 1) % table.capacity();
+        } while (index != originalIndex);
+
+        return nullptr;
+    }
+
+    // Поиск значения по ключу (константная версия).
+    const Value* find(const Key& key) const {
+        KeyValuePair<Key, Value> tempPair(key, Value());
+        size_t index = table.hash(tempPair) % table.capacity();
+        size_t originalIndex = index;
+
+        do {
+            // Проверяем, занята ли ячейка
+            if (table.isOccupied(index)) {
+                const KeyValuePair<Key, Value>& pair = table.getListAtIndex(index);
+                if (pair.key == key) {
+                    return &pair.value;
+                }
+            }
+            index = (index + 1) % table.capacity();
+        } while (index != originalIndex);
+
+        return nullptr;
+    }
 
 
     // Проверка наличия ключа в словаре
@@ -66,33 +121,6 @@ public:
         return table.contains(KeyValuePair<Key, Value>(key, Value()));
     }
 
-
-
-    // Поиск значения по ключу.
-    Value* find(const Key& key) {
-        KeyValuePair<Key, Value> tempPair(key, Value()); // Создаем временную пару для поиска
-        size_t index = table.hash(tempPair) % table.size();
-        for (auto& pair : table.getBucket(index)) { // Итерируемся только по нужному бакету
-            if (pair.key == key) {
-                return &pair.value;
-            }
-        }
-        return nullptr;
-    }
-
-    // Получение значения по ключу (константная версия).
-    const Value* find(const Key& key) const {
-        KeyValuePair<Key, Value> tempPair(key, Value()); // Создаем временную пару для поиска
-        size_t index = table.hash(tempPair) % table.size();
-        for (const auto& pair : table.getBucket(index)) { // Итерируемся только по нужному бакету
-            if (pair.key == key) {
-                return &pair.value;
-            }
-        }
-        return nullptr;
-    }
-
-
     typename HashTable<KeyValuePair<Key, Value>>::iterator begin() {
         return table.begin();
     }
@@ -100,4 +128,64 @@ public:
     typename HashTable<KeyValuePair<Key, Value>>::iterator end() {
         return table.end();
     }
+
+    // Статический метод для тестирования
+    static void testDictionary() {
+        Dictionary<int, string> dict(10);
+
+        // Тестирование insert
+        dict.insert(1, "one");
+        dict.insert(2, "two");
+        dict.insert(11, "eleven"); // Проверка коллизии
+
+        // Тестирование operator[]
+        assert(dict[1] == "one");
+        assert(dict[2] == "two");
+        assert(dict[11] == "eleven");
+        bool caught = false;
+        try {
+            dict[3]; // Ключ не существует
+        }
+        catch (const runtime_error& error) {
+            caught = true;
+        }
+        assert(caught);
+
+
+        // Тестирование contains
+        assert(dict.contains(1));
+        assert(dict.contains(2));
+        assert(dict.contains(11));
+        assert(!dict.contains(3));
+
+        // Тестирование find
+        assert(*dict.find(1) == "one");
+        assert(*dict.find(2) == "two");
+        assert(*dict.find(11) == "eleven");
+        assert(dict.find(3) == nullptr);
+
+        const Dictionary<int, string>& constDict = dict;
+        assert(*constDict.find(1) == "one"); // Тестирование const версии find
+
+
+        // Тестирование erase
+        dict.erase(1);
+        assert(!dict.contains(1));
+        assert(dict.find(1) == nullptr);
+        assert(dict.contains(2));
+        assert(dict.contains(11));
+
+
+
+        // Тестирование insert после erase
+        dict.insert(1, "one_again");
+        assert(dict.contains(1));
+        assert(*dict.find(1) == "one_again");
+
+
+
+
+        cout << "Все тесты пройдены!" << endl;
+    }
+
 };

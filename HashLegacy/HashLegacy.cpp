@@ -181,6 +181,7 @@ void process_file(const string& filename) {
 int main() {
     // Создание словаря
     Dictionary<string, int> dict(10);
+    Dictionary<int, string>::testDictionary();
     //dict.put("apple", 5);
     //dict.put("banana", 7);
 
@@ -209,7 +210,7 @@ int main() {
     // Проверка наличия ключа
     cout << set.contains(5) << endl; // Вывод: 1
 
-    process_file("cipfile.txt");
+    //process_file("cipfile.txt");
 
 
     return 0;
