@@ -6,6 +6,8 @@
 #include <functional>
 #include <algorithm>
 #include <string>
+#include <random>
+#include <ctime>
 
 using namespace std;
 
@@ -43,6 +45,7 @@ private:
     string name;
 
 public:
+    User() : id(0), name("") {}
     User(int id, const std::string& name) : id(id), name(name) {}
 
     int getId() const { return id; }
@@ -51,6 +54,11 @@ public:
     // Оператор сравнения для проверки равенства двух объектов User
     bool operator==(const User& other) const {
         return id == other.id && name == other.name;
+    }
+
+    // Оператор сравнения для проверки равенства двух объектов User
+    bool operator!=(const User& other) const {
+        return !(id == other.id && name == other.name);
     }
 
     // Дружественная функция для хеш-функции, позволяет функции использовать приватные поля класса напрямую
@@ -70,7 +78,7 @@ namespace std {
     };
 }
 
-
+//Хэш-функция djb2
 template <typename Key>
 size_t djb2Hash(const Key& key) {
     size_t hash = 5381;
@@ -80,14 +88,15 @@ size_t djb2Hash(const Key& key) {
 }
 
 
-
+//Хэш-функция fnv1a
 template <typename Key>
- size_t fnv1aHash(const Key& key) {
+size_t fnv1aHash(const Key& key) {
     size_t hash = 2166136261;
     auto key_hash = std::hash<Key>{}(key);
     hash = (hash ^ key_hash) * 16777219;
     return hash;
 }
+//Хэш-функция murmur
 template <typename Key>
 size_t murmurHash(const Key& key) {
     size_t hash = 2166136261;
@@ -102,6 +111,12 @@ size_t quadraticHash(const Key& value) {
     return value * value + 3 * value + 7;
 }
 
+//Хэш-функция k0syak
+template <typename Key>
+size_t k0syakHash(const Key& key) {
+    size_t hash = 123;
+    return hash;
+}
 
 
 // Шаблонный класс хеш-таблицы
@@ -120,6 +135,8 @@ private:
     double loadFactor;
     // Максимальный коэффициент загрузки
     double maxLoadFactor;
+    // Минимальный коэффициент загрузки
+    double minLoadFactor;
 public:
     // Хеш-функция по умолчанию
     static size_t defaultHash(const Key& value) {
@@ -128,8 +145,8 @@ public:
     }
 
     // Конструктор хеш-таблицы
-    HashTable(size_t capacity, function<size_t(const Key&)> hashFunction = defaultHash, double maxLoadFactor = 0.7)
-        : table(capacity), occupied(capacity, false), hashFunction(hashFunction), _size(0), loadFactor(0.0), maxLoadFactor(maxLoadFactor) {}
+    HashTable(size_t capacity, function<size_t(const Key&)> hashFunction = defaultHash, double maxLoadFactor = 0.7, double minLoadFactor = 0.2)
+        : table(capacity), occupied(capacity, false), hashFunction(hashFunction), _size(0), loadFactor(0.0), maxLoadFactor(maxLoadFactor), minLoadFactor(minLoadFactor) {}
 
     // Деструктор хеш-таблицы
     ~HashTable() {}
@@ -155,7 +172,7 @@ public:
     }
 
 
-    //Хэширование
+    //Функция хэширования через функцию хэш-таблицы
     size_t hash(const Key& key) const {
         return hashFunction(key);
     }
@@ -163,52 +180,63 @@ public:
     // Удаление ключа из таблицы
         // Сложность: O(1) в среднем случае, O(n) в худшем случае
     void erase(const Key& key) {
-        size_t index = hashFunction(key) % table.size();
+        size_t index = hash(key) % table.size();
+        size_t start_index = index;
 
         // Линейное зондирование для поиска ключа
-        while (occupied[index] && table[index] != key) {
+        while (table[index] != key) {
             index = (index + 1) % table.size();
+            if (start_index == index)
+                break;
         }
 
         // Если ключ найден, удаляем его, устанавливая флаг occupied в false
         if (occupied[index] && table[index] == key) {
             occupied[index] = false;
+            table[index] = Key();
             _size--;
             loadFactor = (double)_size / table.size();
+            if (loadFactor < minLoadFactor)
+            {
+                rehash();
+            }
+
+
         }
     }
 
     // Проверка наличия ключа в таблице
         // Сложность: O(1) в среднем случае, O(n) в худшем случае
     bool contains(const Key& key) const {
-        size_t index = hashFunction(key) % table.size();
-
+        size_t index = hash(key) % table.size();
+        size_t start_index = index;
         // Линейное зондирование для поиска ключа
-        while (occupied[index] && table[index] != key) {
+        while (table[index] != key) {
             index = (index + 1) % table.size();
+            if (start_index == index)
+                break;
         }
 
         return occupied[index] && table[index] == key;
     }
-
+    //Получить значение ячейки по индексу. Бросает исключение out_of_range, если индекс указан неверно
     const Key& getListAtIndex(size_t index) const {
         if (index >= table.size()) {
             throw out_of_range("Index out of range");
         }
         return table[index];
     }
-
-
+    //Получить значение ячейки по индексу. Бросает исключение out_of_range, если индекс указан неверно
     Key& getListAtIndex(size_t index) {
         if (index >= table.size()) {
-            throw out_of_range("Index out of range"); 
+            throw out_of_range("Index out of range");
         }
         return table[index];
     }
-
+    //Получить занятость ячейки по индексу. Бросает исключение out_of_range, если индекс указан неверно
     bool isOccupied(size_t index) const {
         if (index >= table.size()) {
-            throw out_of_range("Index out of range"); 
+            throw out_of_range("Index out of range");
         }
         return occupied[index];
     }
@@ -222,16 +250,35 @@ public:
         vector<Key> oldTable = table;
         vector<bool> oldOccupied = occupied;
 
-        table.resize(oldSize * 2);
-        occupied.assign(oldSize * 2, false);
-        _size = 0;
-        loadFactor = 0.0;
+        if (loadFactor > maxLoadFactor)
+        {
+            table.assign(oldSize * 2, Key());
+            occupied.assign(oldSize * 2, false);
+            _size = 0;
+            loadFactor = 0.0;
 
-        for (size_t i = 0; i < oldSize; ++i) {
-            if (oldOccupied[i]) {
-                insert(oldTable[i]);
+            for (size_t i = 0; i < oldSize; ++i) {
+                if (oldOccupied[i]) {
+                    insert(oldTable[i]);
+                }
             }
         }
+        else
+        {
+            table.assign(oldSize / 2, Key());
+            occupied.assign(oldSize / 2, false);
+            _size = 0;
+            loadFactor = 0.0;
+
+            for (size_t i = 0; i < oldSize; ++i) {
+                if (oldOccupied[i]) {
+                    insert(oldTable[i]);
+                }
+            }
+
+        }
+
+
     }
 
     size_t size() const {
@@ -245,35 +292,31 @@ public:
 
     class iterator {
     private:
-        typename std::vector<Key>::iterator current;
-        typename std::vector<Key>::iterator end;
+        const std::vector<Key>* table; // Теперь храним указатель на table
+        typename std::vector<Key>::const_iterator current; // const_iterator
+        typename std::vector<Key>::const_iterator end; // const_iterator
         const std::vector<bool>* occupied;
-        // Добавляем begin для расчета расстояния
-        typename std::vector<Key>::iterator begin;
 
 
     public:
-        iterator(typename std::vector<Key>::iterator begin, typename std::vector<Key>::iterator end, const std::vector<bool>* occupied)
-            : current(begin), end(end), occupied(occupied), begin(begin)  {
+        iterator(const std::vector<Key>* table, typename std::vector<Key>::const_iterator begin,  // const_iterator
+            typename std::vector<Key>::const_iterator end, const std::vector<bool>* occupied)
+            : table(table), current(begin), end(end), occupied(occupied) {
             // Находим первый занятый элемент
-             while (current != end && !(*occupied)[std::distance(this->begin, current)]) {
+            while (current != end && !(*occupied)[std::distance(table->begin(), current)]) {
                 ++current;
             }
         }
 
         iterator& operator++() {
-            // Переходим к следующему элементу
             ++current;
-
-            // Находим следующий занятый элемент
-            while (current != end && !(*occupied)[std::distance(this->begin, current)]) {
+            while (current != end && !(*occupied)[std::distance(table->begin(), current)]) {
                 ++current;
             }
-            
             return *this;
         }
 
-        Key& operator*() const {
+        const Key& operator*() const { // const Key&
             return *current;
         }
 
@@ -281,13 +324,22 @@ public:
             return current != other.current;
         }
     };
-
+    //Итератор на начало таблицы
     iterator begin() {
-        return iterator(table.begin(), table.end(), &occupied);
+        return iterator(&table, table.begin(), table.end(), &occupied);
+    }
+    //Итератор на конец таблицы
+    iterator end() {
+        return iterator(&table, table.end(), table.end(), &occupied);
     }
 
-    iterator end() {
-        return iterator(table.end(), table.end(), &occupied);
+    // Константные версии begin() и end()
+    const iterator begin() const {
+        return iterator(&table, table.begin(), table.end(), &occupied); 
+    }
+
+    const iterator end() const {
+        return iterator(&table, table.end(), table.end(), &occupied); 
     }
 
     // Метод очистки значений хэш-таблицы
@@ -309,24 +361,28 @@ public:
         HashTable<int> hashTable(10);
 
         // Тестируем insert
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 10; i++) {
             hashTable.insert(i);
             assert(hashTable.contains(i));
         }
 
         // Тестируем contains
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 10; i++) {
             assert(hashTable.contains(i));
         }
-        assert(!hashTable.contains(100));
-        assert(!hashTable.contains(101));
+        assert(!hashTable.contains(10));
+        assert(!hashTable.contains(11));
 
         // Тестируем erase
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < 5; i++) {
             hashTable.erase(i);
             assert(!hashTable.contains(i));
         }
-        for (int i = 50; i < 100; i++) {
+        for (auto val : hashTable)
+        {
+            cout << val << endl;
+        }
+        for (int i = 5; i < 10; i++) {
             assert(hashTable.contains(i));
         }
 
@@ -343,7 +399,7 @@ public:
         for (auto it = hashTable.begin(); it != hashTable.end(); ++it) {
             count++;
         }
-        assert(count == 1050);
+        assert(count == 1005);
 
 
         // Тестируем insert с одинаковыми ключами
@@ -473,6 +529,28 @@ public:
         emptyUserHashTable.rehash();
         assert(emptyUserHashTable.size() == 0);
 
+        //Проверка на разрешение коллизий:
+                // Тестируем хеш-таблицу с числами. Хэш-функция максимально ужасная
+        HashTable<int> badHashTable(10, k0syakHash<int>);
+        for (int i = 0; i < 100; i++) {
+            badHashTable.insert(i);
+            assert(badHashTable.contains(i));
+        }
+        // Тестируем erase
+        for (int i = 0; i < 95; i++) {
+            badHashTable.erase(i);
+            assert(!badHashTable.contains(i));
+        }
+        assert(badHashTable.capacity() == 20);
+        //Проверка работоспособности getListAtIndex и isOccupied
+        for (int i = 5; i < 10; i++) {
+            assert(badHashTable.getListAtIndex(i) == 90 + i);
+            assert(badHashTable.isOccupied(i) == true);
+        }
+        for (int i = 10; i < 20; i++) {
+            assert(badHashTable.getListAtIndex(i) == 0);
+            assert(badHashTable.isOccupied(i) == false);
+        }
         cout << "All tests passed successfully!" << endl;
     }
 

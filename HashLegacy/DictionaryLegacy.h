@@ -3,9 +3,6 @@
 //HashTable<Key>::
 using namespace std;
 
-// ... (Определения хеш-функций djb2Hash, defaultHash, xorHash, multiplyHash, 
-// sumHash, productHash, xorShiftHash, quadraticHash остаются без изменений) ...
-
 // Хеш-функция для пары, хэширующая только ключ
 template <typename K, typename V>
 size_t hash_value(const KeyValuePair<K, V>& pair) {
@@ -19,22 +16,42 @@ private:
     HashTable<KeyValuePair<Key, Value>> table;
 
 public:
-    // Конструктор словаря
-    Dictionary(size_t capacity, function<size_t(const KeyValuePair<Key, Value>&)> hashFunction = [](const KeyValuePair<Key, Value>& p) { return HashTable<Key>::defaultHash(p.key); }, double maxLoadFactor = 0.7)
+    // Конструктор словаря. 47 -- простое число, число элементов по умолчанию
+    Dictionary(size_t capacity = 47, function<size_t(const KeyValuePair<Key, Value>&)> hashFunction = [](const KeyValuePair<Key, Value>& p) { return HashTable<Key>::defaultHash(p.key); }, double maxLoadFactor = 0.7)
         : table(capacity, hashFunction, maxLoadFactor) {}
 
     // Вставка пары ключ-значение в словарь
     void insert(const Key& key, const Value& value) {
-        table.insert(KeyValuePair<Key, Value>(key, value));
+        KeyValuePair<Key, Value> tempPair(key, value);
+        if (contains(key))
+        {
+            size_t index = table.hash(tempPair) % table.capacity();
+            size_t originalIndex = index;
+
+            do {
+                // Проверяем, занята ли ячейка
+                if (table.isOccupied(index)) {
+                    KeyValuePair<Key, Value>& pair = table.getListAtIndex(index);
+                    if (pair.key == key) {
+                        table.getListAtIndex(index) = tempPair;
+                    }
+                }
+                index = (index + 1) % table.capacity();
+            } while (index != originalIndex);
+        }
+        else
+        {
+        table.insert(tempPair);
+        }
     }
 
-    // Удаление пары ключ-значение из словаря
+    // Удаление пары ключ-значение из словаря.
     void erase(const Key& key) {
         table.erase(KeyValuePair<Key, Value>(key, Value())); // V() создает дефолтное значение для V, необходимо для поиска и удаления
     }
 
 
-    // Получение значения по ключу.
+    // Получение значения по ключу. Бросает исключение runtime_error, если ключ не найден
     Value& operator[](const Key& key) {
         KeyValuePair<Key, Value> tempPair(key, Value());
         size_t index = table.hash(tempPair) % table.capacity();
@@ -54,7 +71,7 @@ public:
         throw runtime_error("Key not found");
     }
 
-    // Получение значения по ключу (константная версия).
+    // Получение значения по ключу (константная версия). Бросает исключение runtime_error, если ключ не найден
     const Value& operator[](const Key& key) const {
         KeyValuePair<Key, Value> tempPair(key, Value());
         size_t index = table.hash(tempPair) % table.capacity();
@@ -74,7 +91,7 @@ public:
         throw runtime_error("Key not found");
     }
 
-    // Поиск значения по ключу.
+    // Поиск значения по ключу. Возвращает nullptr, если значение не найдено
     Value* find(const Key& key) {
         KeyValuePair<Key, Value> tempPair(key, Value());
         size_t index = table.hash(tempPair) % table.capacity();
@@ -94,7 +111,7 @@ public:
         return nullptr;
     }
 
-    // Поиск значения по ключу (константная версия).
+    // Поиск значения по ключу (константная версия). Возвращает nullptr, если значение не найдено
     const Value* find(const Key& key) const {
         KeyValuePair<Key, Value> tempPair(key, Value());
         size_t index = table.hash(tempPair) % table.capacity();
@@ -120,13 +137,23 @@ public:
         // Создаем временную пару с фиктивным значением для поиска
         return table.contains(KeyValuePair<Key, Value>(key, Value()));
     }
-
+    //Итератор, указывающий на начало словаря
     typename HashTable<KeyValuePair<Key, Value>>::iterator begin() {
         return table.begin();
     }
-
+    //Итератор, указывающий на конец словаря
     typename HashTable<KeyValuePair<Key, Value>>::iterator end() {
         return table.end();
+    }
+
+    //Итератор, указывающий на начало словаря (константная версия)
+    typename HashTable<KeyValuePair<Key, Value>>::iterator begin() const {
+        return table.begin(); // или table.cbegin(), если HashTable его предоставляет
+    }
+
+    //Итератор, указывающий на конец словаря (константная версия)
+    typename HashTable<KeyValuePair<Key, Value>>::iterator end() const {
+        return table.end(); // или table.cend(), если HashTable его предоставляет
     }
 
     // Статический метод для тестирования
