@@ -254,30 +254,19 @@ public:
         {
             table.assign(oldSize * 2, Key());
             occupied.assign(oldSize * 2, false);
-            _size = 0;
-            loadFactor = 0.0;
-
-            for (size_t i = 0; i < oldSize; ++i) {
-                if (oldOccupied[i]) {
-                    insert(oldTable[i]);
-                }
-            }
         }
         else
         {
             table.assign(oldSize / 2, Key());
             occupied.assign(oldSize / 2, false);
-            _size = 0;
-            loadFactor = 0.0;
-
-            for (size_t i = 0; i < oldSize; ++i) {
-                if (oldOccupied[i]) {
-                    insert(oldTable[i]);
-                }
-            }
-
         }
-
+        _size = 0;
+        loadFactor = 0.0;
+        for (size_t i = 0; i < oldSize; ++i) {
+            if (oldOccupied[i]) {
+                insert(oldTable[i]);
+            }
+        }
 
     }
 
