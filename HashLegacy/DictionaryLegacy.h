@@ -212,7 +212,7 @@ public:
 
 
 
-        cout << "Все тесты пройдены!" << endl;
+        cout << "All tests passed successfully!" << endl;
     }
 
 };
